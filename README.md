@@ -7,6 +7,4 @@ Análisis econométrico de la relación de largo plazo entre los rendimientos de
 
 A continuación puedes **ver el informe directamente**:
 
-<embed src="Análisis de cointegración para bonos de Canada.pdf" type="application/pdf" width="100%" height="600px" />
-
-Si prefieres, también puedes [descargar el PDF aquí](Análisis de cointegración para bonos de Canada.pdf).
+[Ver o descargar el PDF](Análisis de cointegración para bonos de Canada.pdf)
