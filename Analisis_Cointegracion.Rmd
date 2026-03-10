@@ -1,0 +1,272 @@
+---
+title: "Análisis de cointegración para bonos de Canada"
+output:
+  html_document: default
+  pdf_document: default
+date: "2026-01-28"
+---
+
+```{r}
+rm(list = ls()) 
+```
+
+```{r message=FALSE, warning=FALSE}
+# Se utiliza la libreria 'easypackages' para cargar e instalar muliples paquetes a la vez
+library(easypackages)
+```
+
+```{r message=FALSE, warning=FALSE}
+libraries('normtest', 'vars', 'forecast', 'urca', 'moments', 'vioplot', 'tsDyn', 'tseries')
+```
+
+```{r}
+# Se carga el archivo de los bonos canadienses
+load("bond_yields.RData")
+```
+
+```{r}
+# Definimos la variable con la que se va a trabajar y realizamos una observación a los datos
+bonds <- data
+head(bonds)
+tail(bonds)
+```
+# Análisis descriptivo de los datos
+
+```{r}
+# Gráfico de las series
+par(mfrow = c(2,1), mar = c(2.5,5,1,1), las = 0, cex.axis = 1.05, cex.lab = 1.05)
+ts.plot(bonds[,'aaa'],    ylab='bonos corporativos AAA')
+ts.plot(bonds[,'bbb'], ylab='bonos corporativos BAA')
+```
+
+```{r}
+# ACF de las series
+par(mfrow = c(1,2), mar = c(4.2,4.2,1,1), las = 0, cex.axis = 1.05, cex.lab = 1.05)
+Acf(bonds[,'aaa'],    ylab='AAA', xlab='Lag', lag.max = 40)
+Acf(bonds[,'bbb'], ylab='BAA', xlab='Lag', lag.max = 40)
+
+```
+
+```{r}
+summary(bonds)
+```
+```{r}
+# quantiles
+quantile(bonds[,1], probs = seq(0, 1, 0.25), names = TRUE, type = 7)
+quantile(bonds[,2], probs = seq(0, 1, 0.25), names = TRUE, type = 7)
+```
+```{r}
+skewness(bonds) # asimertría
+kurtosis(bonds) # curtosis
+```
+
+```{r}
+# Histogramas
+par(mfrow=c(2,1), mar = c(2.5,5,1,1), las = 0, cex.axis = 1.05, cex.lab = 1.05)
+for (m in 1:2) {
+  hist(bonds[,m], prob=TRUE, xlab = colnames(bonds)[m], main='')
+  lines(density(bonds[,m]), xlim=range(bonds[,m]), col=2)
+}
+```
+```{r}
+# Box-plots
+par(mfrow=c(2,1), mar = c(2.5,5,1,1), las = 0, cex.axis = 1.05, cex.lab = 1.05)
+for (m in 1:2) {
+  boxplot(bonds[,m], ylab=colnames(bonds)[m], horizontal = TRUE)
+}
+```
+```{r}
+# Gráficos de violin
+par(mfrow=c(2,1), mar = c(2.5,5,1,1), las = 0, cex.axis = 1.05, cex.lab = 1.05)
+for (m in 1:2) {
+  vioplot(bonds[,m], ylab=colnames(bonds)[m], col=gray(0.7), horizontal = T)
+}
+```
+
+```{r}
+# Test de portmanteau para identificar autocorrelación de las variables
+Box.test(bonds[,'aaa'],    lag=20, type = 'Ljung-Box', fitdf = 0)
+Box.test(bonds[,'bbb'], lag=20, type = 'Ljung-Box', fitdf = 0)
+```
+
+# Análisis de estacionariedad de las series
+
+```{r}
+# Prueba de ADF
+adf.test(bonds[,"aaa"]) 
+adf.test(bonds[,"bbb"]) 
+```
+
+```{r}
+# Determinación del rezago p para el tes de ADF
+p_max1 <- floor(12*(dim(bonds)[1]/100)^0.25)
+p_max2 <- floor(4*(dim(bonds)[1]/100)^0.25)
+p_max <- floor((dim(bonds)[1]-1)^(1/3))
+p_max1
+p_max2
+p_max
+```
+
+
+```{r}
+# Test ADF a la serie 'AAA' con tres especificaciones (tendencia, constante y sin determinísticos) 
+df_aaa_trend <- ur.df(bonds[,'aaa'], type = 'trend', lags=p_max, selectlags='BIC')
+df_aaa_drift <- ur.df(bonds[,'aaa'], type = 'drift', lags=p_max, selectlags='BIC') 
+df_aaa_none <- ur.df(bonds[,'aaa'], type = 'none', lags=p_max, selectlags='BIC') 
+summary(df_aaa_trend)
+summary(df_aaa_drift)
+summary(df_aaa_none)
+```
+
+
+```{r}
+# Gráfico del test final ADF para AAA
+plot(df_aaa_none)
+```
+```{r}
+# Test ADF a la serie 'BAA' con tres especificaciones (tendencia, constante y sin determinísticos) 
+df_bbb_trend <- ur.df(bonds[,'bbb'], type = 'trend', lags=p_max, selectlags='BIC')
+df_bbb_drift <- ur.df(bonds[,'bbb'], type = 'drift', lags=p_max, selectlags='BIC') 
+df_bbb_none <- ur.df(bonds[,'bbb'], type = 'none', lags=p_max, selectlags='BIC') 
+summary(df_bbb_trend)
+summary(df_bbb_drift)
+summary(df_bbb_none)
+```
+
+```{r}
+# Gráfico del test final ADF para BAA
+plot(df_bbb_none)
+```
+# Modelo VAR
+
+```{r}
+# Seleccion del número óptimo de rezagos para el VAR y evalúa el posible rango de cointegración del sistema.
+VARselect(bonds, lag.max = p_max, type = 'none')
+lags.select(bonds, lag.max = p_max, include = 'none') 
+rank.select(bonds, lag.max = p_max, include = 'none')
+```
+
+```{r}
+# Estimación del modelo Var(p)
+bonds <- bonds[, c('aaa', 'bbb')]
+var <- VAR(bonds, p = 3, type = 'none')
+summary(var)
+```
+
+```{r}
+# Test de portmanteau para el Var
+serial.test(var, lags.pt = 16, type = 'PT.adjusted')
+```
+
+```{r}
+# Test de Jarque-Bera
+normality.test(var)
+```
+
+
+# Análisis de cointegración
+
+```{r}
+bonds <- bonds[, c("aaa", "bbb")]
+```
+
+```{r}
+# Test de cointegración de Johansen (estadísticos Trace y Eigen) para determinar el número de relaciones de cointegración entre las variables.
+summary(ca.jo(bonds, type = 'trace', ecdet = 'trend', K = 3, spec = 'transitory'))
+summary(ca.jo(bonds, type = 'eigen', ecdet = 'trend', K = 3, spec = 'transitory'))
+```
+
+```{r}
+# # Estima el modelo VECM mediante el test de cointegración de Johansen
+vecm <- ca.jo(bonds, type = 'trace', ecdet = 'trend', K = 3, spec = 'transitory')
+summary(vecm)
+```
+
+
+```{r}
+# Estimación del VECM imponiendo r = 1 relación de cointegración
+vecm.r1 <- cajorls(vecm, r = 1)
+summary(vecm.r1$rlm)
+```
+```{r}
+# Coeficientes de velocidad de ajuste (α) y el vector de cointegración (β) del modelo VECM.
+alpha <- coef(vecm.r1$rlm)[1, ]
+names(alpha) <- c('aaa', 'bbb')
+alpha
+beta <- vecm.r1$beta
+beta
+```
+
+
+
+```{r}
+# Errores estándar y estadísticos t de los coeficientes de ajuste (α) del VECM.
+resids <- resid(vecm.r1$rlm)
+sigma <- crossprod(resids) / nrow(resids)
+alpha.se <- sqrt(solve(crossprod(cbind(vecm@ZK %*% beta, vecm@Z1)))[1, 1] * diag(sigma))
+names(alpha.se) <-  c('aaa', 'bbb')
+alpha.t <- alpha / alpha.se
+alpha.t
+```
+```{r}
+# Errores estándar y los estadísticos t del vector de cointegración (β) del VECM.
+beta.se <- sqrt(diag(kronecker(solve(crossprod(vecm@RK[, -1])),solve(t(alpha) %*% solve(sigma) %*% alpha))))
+beta.t <- c(NA, beta[-1] / beta.se)
+names(beta.t) <- rownames(vecm.r1$beta)
+beta.t
+```
+
+
+```{r}
+# Relación de cointegración (ECT) del VECM, grafica en el tiempo y función de autocorrelación.
+beta <- vecm.r1$beta
+X <- cbind(bonds[, c('aaa', 'bbb')], t=seq(1,dim(bonds)[1]))
+coint <- X %*% beta
+rel_coint <- ts(as.numeric(coint), start = start(bonds), frequency = frequency(bonds))
+plot(rel_coint, main="Relacion de cointegracion (ECT) con tendencia", ylab="ECT", xlab="Tiempo")
+par(mfrow = c(1,2), mar = c(4.2,4.2,1,1), las = 0, cex.axis = 1.05, cex.lab = 1.05)
+Acf(rel_coint)
+Pacf(rel_coint)
+```
+
+```{r}
+# Test ADF a la relación de cointegración (ECT) bajo las distintas especificaciones
+df_rel_coint_d <- ur.df(rel_coint, type = "trend", lags =8, selectlags = "BIC")
+df_rel_coint_t <- ur.df(rel_coint, type = 'drift', lags=8, selectlags='BIC') 
+df_rel_coint_n <- ur.df(rel_coint, type = 'none', lags=8, selectlags='BIC') 
+summary(df_rel_coint_d)
+summary(df_rel_coint_t)
+summary(df_rel_coint_n)
+```
+
+```{r}
+plot(df_rel_coint_d)
+```
+```{r}
+# Phillips-Perron test
+pp1 <- ur.pp(rel_coint, type = "Z-tau", model = "trend", lags = "long")
+summary(pp1)
+plot(pp1)
+```
+
+
+```{r}
+# VECM con r = 1 y sus coeficientes de corto plazo, ajuste y cointegración.
+summary(rank.test(VECM(bonds, lag=2, include='const', LRinclude='trend', estim='ML'), cval = 0.05))
+rank.test(VECM(bonds, lag=2, include='const', LRinclude='trend', estim='ML'), type = 'trace', cval = 0.05)
+rank.test(VECM(bonds, lag=2, include='const', LRinclude='trend', estim='ML'), type = 'eigen', cval = 0.05)
+```
+
+
+```{r}
+# VECM (r=1) por máxima verosimilitud y sus coeficientes de corto plazo (B), ajuste (A) y matriz Π.
+vecm <- VECM(bonds, lag=2, r=1, include='const', LRinclude='trend', estim='ML')
+summary(vecm)
+coefB(vecm)
+coefA(vecm)
+coefPI(vecm)
+```
+
+
+
+
