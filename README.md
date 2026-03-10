@@ -194,6 +194,16 @@ $$
 ΔAAA : 0.0242
 ΔBBB : 0.0915
 ```
+#### Relación de cointegración (ECT) del VECM y grafica en el tiempo.
+```r
+beta <- vecm.r1$beta
+X <- cbind(bonds[, c('aaa', 'bbb')], t=seq(1,dim(bonds)[1]))
+coint <- X %*% beta
+rel_coint <- ts(as.numeric(coint), start = start(bonds), frequency = frequency(bonds))
+plot(rel_coint, main="Relacion de cointegracion (ECT) con tendencia", ylab="ECT", xlab="Tiempo")
+```
+<img width="629" height="389" alt="image" src="https://github.com/user-attachments/assets/9112ad05-9405-442a-bfd7-01407e795327" />
+
 
 
 
